@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MdVisibility, MdVisibilityOff } from 'react-icons/md';
-import { authApi } from '../../api/authApi';
-import logoImage from '../../assets/logo_ruangin.png';
-import wallpaperImage from '../../assets/auth/wallpaper_auth.jpg';
+import { authApi } from '@/api';
+import logoImage from '@/assets/logo_ruangin.png';
+import wallpaperImage from '@/assets/auth/wallpaper_auth.jpg';
 
 export default function Login() {
   const navigate = useNavigate();
