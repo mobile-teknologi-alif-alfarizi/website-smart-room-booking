@@ -1,68 +1,23 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:8000/api';
-
-const api = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-// Add token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import axiosInstance from './authApi';
 
 export const kampusApi = {
-  // Get all kampus
-  getAllKampus: async () => {
-    try {
-      const response = await api.get('/kampus');
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+  getAllKampus: () => {
+    return axiosInstance.get('/kampus');
   },
 
-  // Get single kampus
-  getKampus: async (id) => {
-    try {
-      const response = await api.get(`/kampus/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+  getKampus: (id) => {
+    return axiosInstance.get(`/kampus/${id}`);
   },
 
-  // Create new kampus
-  createKampus: async (data) => {
-    try {
-      const response = await api.post('/kampus', data);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+  createKampus: (data) => {
+    return axiosInstance.post('/kampus', data);
   },
 
-  // Update kampus
-  updateKampus: async (id, data) => {
-    try {
-      const response = await api.put(`/kampus/${id}`, data);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+  updateKampus: (id, data) => {
+    return axiosInstance.put(`/kampus/${id}`, data);
   },
 
-  // Delete kampus
-  deleteKampus: async (id) => {
-    try {
-      const response = await api.delete(`/kampus/${id}`);
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+  deleteKampus: (id) => {
+    return axiosInstance.delete(`/kampus/${id}`);
   },
 };
