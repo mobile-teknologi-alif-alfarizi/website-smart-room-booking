@@ -1,7 +1,28 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MdAdd, MdEdit, MdDelete, MdSearch, MdViewList, MdSupervisorAccount, MdSchool, MdBusinessCenter, MdWarning, MdClose, MdVisibility, MdVisibilityOff } from 'react-icons/md';
+import { MdAdd, MdEdit, MdDelete, MdSearch, MdViewList, MdSupervisorAccount, MdSchool, MdBusinessCenter, MdWarning, MdClose, MdVisibility, MdVisibilityOff, MdCheckCircle } from 'react-icons/md';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import { userApi } from '@/api/userApi';
+
+// Data struktur Fakultas dan Program Studi
+const FACULTY_DATA = {
+  'Fakultas Ilmu Sosial & Bisnis': [
+    'Hubungan Internasional',
+    'Ilmu Komunikasi',
+    'Ilmu Politik',
+    'Administrasi Bisnis',
+    'Akuntansi dan Perpajakan',
+    'Peradilan Pidana'
+  ],
+  'Fakultas Sains & Teknologi': [
+    'Desain Komunikasi Visual',
+    'Desain Interior',
+    'Matematika',
+    'Biologi',
+    'Fisika',
+    'Kimia',
+    'Informatika'
+  ]
+};
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -15,8 +36,18 @@ export default function UserManagement() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [formData, setFormData] = useState({ name: '', nomor_induk: '', password: '', role: 'mahasiswa' });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    nomor_induk: '', 
+    password: '', 
+    role: 'mahasiswa',
+    fakultas: '',
+    program_studi: ''
+  });
   const [showPassword, setShowPassword] = useState(false);
+  const [isFormLoading, setIsFormLoading] = useState(false);
+  const [selectedFakultas, setSelectedFakultas] = useState('semua');
+  const [selectedProgramStudi, setSelectedProgramStudi] = useState('semua');
 
   const itemsPerPage = 5;
 
@@ -24,6 +55,21 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  // Reset filters when role changes
+  useEffect(() => {
+    if (selectedRole !== 'mahasiswa') {
+      setSelectedFakultas('semua');
+      setSelectedProgramStudi('semua');
+    }
+    setCurrentPage(1);
+  }, [selectedRole]);
+
+  // Reset program studi when fakultas changes
+  useEffect(() => {
+    setSelectedProgramStudi('semua');
+    setCurrentPage(1);
+  }, [selectedFakultas]);
 
   // Auto hide success message
   useEffect(() => {
@@ -47,22 +93,39 @@ export default function UserManagement() {
     }
   };
 
-  // Filter users
+  // Get available faculties and programs
+  const getAvailableFaculties = () => {
+    return Object.keys(FACULTY_DATA);
+  };
+
+  const getAvailablePrograms = () => {
+    if (selectedFakultas === 'semua') {
+      return [];
+    }
+    return FACULTY_DATA[selectedFakultas] || [];
+  };
+
+  // Filter and sort users
   const filteredUsers = useMemo(() => {
-    return users.filter(user => {
+    const filtered = users.filter(user => {
       const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            user.nomor_induk.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesRole = selectedRole === 'semua' || user.role === selectedRole;
-      return matchesSearch && matchesRole;
+      const matchesFakultas = selectedRole !== 'mahasiswa' || selectedFakultas === 'semua' || user.fakultas === selectedFakultas;
+      const matchesProgramStudi = selectedRole !== 'mahasiswa' || selectedProgramStudi === 'semua' || user.program_studi === selectedProgramStudi;
+      return matchesSearch && matchesRole && matchesFakultas && matchesProgramStudi;
     });
-  }, [users, searchQuery, selectedRole]);
+    
+    // Sort by nomor_induk
+    return filtered.sort((a, b) => a.nomor_induk.localeCompare(b.nomor_induk));
+  }, [users, searchQuery, selectedRole, selectedFakultas, selectedProgramStudi]);
 
   // Pagination
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const handleAddUser = () => {
-    setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa' });
+    setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa', fakultas: '', program_studi: '' });
     setSelectedUser(null);
     setShowPassword(false);
     setIsAddModalOpen(true);
@@ -70,7 +133,14 @@ export default function UserManagement() {
 
   const handleEditUser = (user) => {
     setSelectedUser(user);
-    setFormData({ name: user.name, nomor_induk: user.nomor_induk, password: '', role: user.role });
+    setFormData({ 
+      name: user.name, 
+      nomor_induk: user.nomor_induk, 
+      password: '', 
+      role: user.role,
+      fakultas: user.fakultas || '',
+      program_studi: user.program_studi || ''
+    });
     setShowPassword(false);
     setIsEditModalOpen(true);
   };
@@ -82,6 +152,7 @@ export default function UserManagement() {
 
   const handleSaveUser = async () => {
     try {
+      setIsFormLoading(true);
       if (selectedUser) {
         // Edit user
         const updateData = { ...formData };
@@ -93,6 +164,7 @@ export default function UserManagement() {
         // Add new user
         if (!formData.password) {
           setError('Password harus diisi untuk user baru');
+          setIsFormLoading(false);
           return;
         }
         await userApi.createUser({
@@ -103,18 +175,21 @@ export default function UserManagement() {
         setIsAddModalOpen(false);
       }
       fetchUsers();
-      setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa' });
+      setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa', fakultas: '', program_studi: '' });
       setShowPassword(false);
       setError(null);
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.response?.data?.error || 'Gagal menyimpan user';
       setError(errorMsg);
       console.error('Error saving user:', err);
+    } finally {
+      setIsFormLoading(false);
     }
   };
 
   const handleConfirmDelete = async () => {
     try {
+      setIsFormLoading(true);
       await userApi.deleteUser(selectedUser.id);
       setSuccessMessage('User berhasil dihapus');
       setIsDeleteModalOpen(false);
@@ -126,6 +201,8 @@ export default function UserManagement() {
       const errorMsg = err.response?.data?.message || 'Gagal menghapus user';
       setError(errorMsg);
       console.error('Error deleting user:', err);
+    } finally {
+      setIsFormLoading(false);
     }
   };
 
@@ -162,21 +239,69 @@ export default function UserManagement() {
     }
   };
 
+  // Get available program studies based on selected faculty
+  const getAvailableProgramStudies = () => {
+    if (formData.fakultas && FACULTY_DATA[formData.fakultas]) {
+      return FACULTY_DATA[formData.fakultas];
+    }
+    return [];
+  };
+
   return (
     <DashboardLayout>
-      <div className="space-y-6" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <div className="space-y-6 p-8" style={{ fontFamily: 'Poppins, sans-serif' }}>
         {/* Error Message */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center justify-between">
-            <p className="text-sm text-red-700">{error}</p>
-            <button onClick={() => setError(null)} className="text-red-600 hover:text-red-800">✕</button>
+        {/* Success Modal */}
+        {successMessage && (
+          <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="px-6 py-8 text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="relative w-16 h-16 bg-green-100 rounded-full flex items-center justify-center animate-bounce">
+                    <MdCheckCircle size={32} className="text-green-600" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Berhasil!</h2>
+                <p className="text-gray-600 text-sm">{successMessage}</p>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Success Message */}
-        {successMessage && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <p className="text-sm text-green-700">{successMessage}</p>
+        {/* Error Modal */}
+        {error && (
+          <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="px-6 py-6 border-b border-red-200 bg-red-50 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-red-900">Terjadi Kesalahan</h2>
+                <button
+                  onClick={() => setError(null)}
+                  className="text-red-600 hover:bg-red-100 p-1 rounded-lg transition-all"
+                >
+                  <MdClose size={24} />
+                </button>
+              </div>
+              <div className="px-6 py-6">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+                      <MdWarning size={24} className="text-red-600" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-gray-700 text-sm">{error}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3 justify-end">
+                <button
+                  onClick={() => setError(null)}
+                  className="px-4 py-2.5 rounded-lg text-white font-semibold text-sm transition-all bg-red-600 hover:bg-red-700"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -234,6 +359,86 @@ export default function UserManagement() {
           </div>
         </div>
 
+        {/* Faculty and Program Studi Filters (Mahasiswa Only) */}
+        {selectedRole === 'mahasiswa' && (
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Faculty Filter */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Fakultas</label>
+                <select
+                  value={selectedFakultas}
+                  onChange={(e) => {
+                    setSelectedFakultas(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent text-sm appearance-none bg-white cursor-pointer transition-all"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.5em 1.5em',
+                    paddingRight: '2.5rem'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#6C5CE7';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(108, 92, 231, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  <option value="semua">Semua Fakultas</option>
+                  {getAvailableFaculties().map((faculty) => (
+                    <option key={faculty} value={faculty}>
+                      {faculty}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Program Studi Filter */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Program Studi</label>
+                <select
+                  value={selectedProgramStudi}
+                  onChange={(e) => {
+                    setSelectedProgramStudi(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  disabled={selectedFakultas === 'semua'}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-transparent text-sm appearance-none bg-white cursor-pointer transition-all disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.5em 1.5em',
+                    paddingRight: '2.5rem'
+                  }}
+                  onFocus={(e) => {
+                    if (!e.target.disabled) {
+                      e.target.style.borderColor = '#6C5CE7';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(108, 92, 231, 0.1)';
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                >
+                  <option value="semua">Semua Program Studi</option>
+                  {getAvailablePrograms().map((program) => (
+                    <option key={program} value={program}>
+                      {program}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Loading State */}
         {loading ? (
           <div className="bg-white rounded-lg shadow-sm p-8 text-center">
@@ -248,24 +453,42 @@ export default function UserManagement() {
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Nama</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase w-12">No</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Nomor Induk</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Nama</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Role</th>
+                      {selectedRole === 'mahasiswa' && (
+                        <>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Fakultas</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Program Studi</th>
+                        </>
+                      )}
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {paginatedUsers.length > 0 ? (
-                      paginatedUsers.map((user) => (
+                      paginatedUsers.map((user, index) => (
                         <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-6 py-4 text-sm text-gray-900 font-medium">{user.name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-600 font-medium text-center">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                           <td className="px-6 py-4 text-sm text-gray-600">{user.nomor_induk}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900 font-medium">{user.name}</td>
                           <td className="px-6 py-4 text-sm">
                             <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
                               {getRoleIcon(user.role)}
                               {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                             </span>
                           </td>
+                          {selectedRole === 'mahasiswa' && (
+                            <>
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {user.fakultas || '-'}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {user.program_studi || '-'}
+                              </td>
+                            </>
+                          )}
                           <td className="px-6 py-4 text-center">
                             <div className="flex items-center justify-center gap-2">
                               <button
@@ -288,7 +511,7 @@ export default function UserManagement() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="4" className="px-6 py-4 text-center text-gray-600">
+                        <td colSpan={selectedRole === 'mahasiswa' ? 7 : 5} className="px-6 py-4 text-center text-gray-600">
                           Tidak ada data user
                         </td>
                       </tr>
@@ -298,7 +521,7 @@ export default function UserManagement() {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {filteredUsers.length > 0 && (
                 <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
                   <div className="text-sm text-gray-600">
                     Menampilkan {paginatedUsers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0} - {Math.min(currentPage * itemsPerPage, filteredUsers.length)} dari {filteredUsers.length} data
@@ -307,7 +530,7 @@ export default function UserManagement() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
                       Sebelumnya
                     </button>
@@ -328,7 +551,7 @@ export default function UserManagement() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                       disabled={currentPage === totalPages}
-                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                     >
                       Selanjutnya
                     </button>
@@ -342,17 +565,22 @@ export default function UserManagement() {
         {/* Add/Edit Modal */}
         {(isAddModalOpen || isEditModalOpen) && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden">
               {/* Modal Header */}
-              <div style={{ background: 'linear-gradient(135deg, #6C5CE7 0%, #5f3dc4 100%)' }} className="px-6 py-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-white">
-                  {selectedUser ? 'Edit User' : 'Tambah User Baru'}
-                </h2>
+              <div style={{ background: 'linear-gradient(135deg, #6C5CE7 0%, #5f3dc4 100%)' }} className="px-6 py-5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <MdEdit size={24} className="text-white" />
+                  </div>
+                  <h2 className="text-lg font-bold text-white">
+                    {selectedUser ? 'Edit User' : 'Tambah User Baru'}
+                  </h2>
+                </div>
                 <button
                   onClick={() => {
                     setIsAddModalOpen(false);
                     setIsEditModalOpen(false);
-                    setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa' });
+                    setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa', fakultas: '', program_studi: '' });
                     setShowPassword(false);
                   }}
                   className="text-white hover:bg-white/20 p-1 rounded-lg transition-all"
@@ -363,60 +591,130 @@ export default function UserManagement() {
 
               {/* Modal Body */}
               <div className="px-6 py-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Lengkap</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all"
-                      placeholder="Masukkan nama user"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Nomor Induk</label>
-                    <input
-                      type="text"
-                      value={formData.nomor_induk}
-                      onChange={(e) => setFormData({ ...formData, nomor_induk: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all"
-                      placeholder="Masukkan nomor induk"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Password {selectedUser && <span className="text-xs text-gray-500 font-normal">(kosongkan jika tidak ingin mengubah)</span>}
-                    </label>
-                    <div className="relative">
+                <div className="space-y-5 max-h-[70vh] overflow-y-auto">
+                  {/* Section: Basic Info */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2.5">Nama Lengkap</label>
                       <input
-                        type={showPassword ? 'text' : 'password'}
-                        value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all pr-10"
-                        placeholder="Masukkan password"
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-500 text-sm transition-all bg-white"
+                        placeholder="Masukkan nama user"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
-                      >
-                        {showPassword ? <MdVisibilityOff size={20} /> : <MdVisibility size={20} />}
-                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2.5">Nomor Induk</label>
+                      <input
+                        type="text"
+                        value={formData.nomor_induk}
+                        onChange={(e) => setFormData({ ...formData, nomor_induk: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-500 text-sm transition-all bg-white"
+                        placeholder="Masukkan nomor induk"
+                      />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Role</label>
-                    <select
-                      value={formData.role}
-                      onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm transition-all"
-                    >
-                      <option value="mahasiswa">Mahasiswa</option>
-                      <option value="dosen">Dosen</option>
-                      <option value="admin">Admin</option>
-                    </select>
+
+                  {/* Divider */}
+                  <div className="border-t border-gray-200"></div>
+
+                  {/* Section: Password & Role */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2.5">
+                        Password {selectedUser && <span className="text-xs text-gray-500 font-normal">(opsional untuk edit)</span>}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={formData.password}
+                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-500 text-sm transition-all pr-10 bg-white"
+                          placeholder={selectedUser ? 'Kosongkan jika tidak ingin mengubah' : 'Masukkan password'}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                        >
+                          {showPassword ? <MdVisibilityOff size={20} /> : <MdVisibility size={20} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2.5">Role</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { value: 'mahasiswa', label: 'Mahasiswa', icon: <MdSchool size={18} /> },
+                          { value: 'dosen', label: 'Dosen', icon: <MdBusinessCenter size={18} /> },
+                          { value: 'admin', label: 'Admin', icon: <MdSupervisorAccount size={18} /> }
+                        ].map((role) => (
+                          <button
+                            key={role.value}
+                            onClick={() => setFormData({ ...formData, role: role.value, fakultas: '', program_studi: '' })}
+                            className={`px-3 py-2.5 rounded-lg font-medium text-sm transition-all flex items-center justify-center gap-2 ${
+                              formData.role === role.value
+                                ? 'bg-purple-600 text-white shadow-md'
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {role.icon}
+                            <span className="hidden sm:inline">{role.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Conditional Fakultas and Program Studi Fields for Mahasiswa */}
+                  {formData.role === 'mahasiswa' && (
+                    <>
+                      <div className="border-t border-gray-200"></div>
+                      <div className="space-y-4 bg-blue-50 p-4 rounded-lg">
+                        <p className="text-xs font-semibold text-blue-700">ℹ️ Info Akademik Mahasiswa</p>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2.5">Fakultas</label>
+                          <select
+                            value={formData.fakultas}
+                            onChange={(e) => setFormData({ ...formData, fakultas: e.target.value, program_studi: '' })}
+                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all bg-white"
+                          >
+                            <option value="">-- Pilih Fakultas --</option>
+                            {Object.keys(FACULTY_DATA).map((faculty) => (
+                              <option key={faculty} value={faculty}>
+                                {faculty}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2.5">
+                            Program Studi
+                            {!formData.fakultas && <span className="text-xs font-normal text-blue-600 ml-2 bg-blue-100 px-2 py-0.5 rounded">Pilih fakultas dulu</span>}
+                          </label>
+                          <select
+                            value={formData.program_studi}
+                            onChange={(e) => setFormData({ ...formData, program_studi: e.target.value })}
+                            disabled={!formData.fakultas}
+                            className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all ${
+                              !formData.fakultas 
+                                ? 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed' 
+                                : 'border-gray-300 bg-white'
+                            }`}
+                          >
+                            <option value="">-- Pilih Program Studi --</option>
+                            {getAvailableProgramStudies().map((program) => (
+                              <option key={program} value={program}>
+                                {program}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -426,19 +724,34 @@ export default function UserManagement() {
                   onClick={() => {
                     setIsAddModalOpen(false);
                     setIsEditModalOpen(false);
-                    setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa' });
+                    setFormData({ name: '', nomor_induk: '', password: '', role: 'mahasiswa', fakultas: '', program_studi: '' });
                     setShowPassword(false);
                   }}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-semibold text-sm hover:bg-gray-100 transition-all"
+                  disabled={isFormLoading}
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-semibold text-sm hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleSaveUser}
-                  className="px-4 py-2.5 rounded-lg text-white font-semibold text-sm transition-all"
-                  style={{ backgroundColor: '#6C5CE7' }}
+                  disabled={isFormLoading}
+                  className="px-4 py-2.5 rounded-lg text-white font-semibold text-sm transition-all hover:shadow-lg disabled:opacity-75 disabled:cursor-not-allowed flex items-center gap-2"
+                  style={{ 
+                    backgroundColor: isFormLoading ? '#8b7ed6' : '#6C5CE7',
+                    opacity: isFormLoading ? 0.8 : 1
+                  }}
                 >
-                  {selectedUser ? 'Update' : 'Tambah'}
+                  {isFormLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <MdCheckCircle size={18} />
+                      <span>{selectedUser ? 'Update' : 'Tambah'}</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -491,15 +804,30 @@ export default function UserManagement() {
                     setSelectedUser(null);
                     setShowPassword(false);
                   }}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-semibold text-sm hover:bg-gray-100 transition-all"
+                  disabled={isFormLoading}
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg text-gray-700 font-semibold text-sm hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Batal
                 </button>
                 <button
                   onClick={handleConfirmDelete}
-                  className="px-4 py-2.5 rounded-lg text-white font-semibold text-sm transition-all bg-red-600 hover:bg-red-700"
+                  disabled={isFormLoading}
+                  className="px-4 py-2.5 rounded-lg text-white font-semibold text-sm transition-all disabled:opacity-75 disabled:cursor-not-allowed flex items-center gap-2"
+                  style={{ 
+                    backgroundColor: isFormLoading ? '#d97f7f' : '#dc2626',
+                  }}
                 >
-                  Hapus
+                  {isFormLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Menghapus...</span>
+                    </>
+                  ) : (
+                    <>
+                      <MdWarning size={18} />
+                      <span>Hapus</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

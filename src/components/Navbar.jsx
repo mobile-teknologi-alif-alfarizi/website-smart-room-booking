@@ -14,8 +14,8 @@ export default function Navbar() {
   }, []);
 
   const today = new Date();
-  const dateOptions = { weekday: 'long', day: 'numeric', month: 'long' };
-  const formattedDate = today.toLocaleDateString('en-US', dateOptions);
+  const dateOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  const formattedDate = today.toLocaleDateString('id-ID', dateOptions);
 
   const handleLogoutConfirm = () => {
     localStorage.removeItem('token');
@@ -34,7 +34,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="fixed top-0 left-56 right-0 bg-white shadow-sm border-b border-gray-200 z-40" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      <nav className="fixed top-0 left-64 right-0 bg-white shadow-sm border-b border-gray-200 z-40" style={{ fontFamily: 'Poppins, sans-serif' }}>
         <div className="px-8 py-5 flex items-center justify-between">
           {/* Search Bar */}
           <div className="flex-1 max-w-md">
@@ -42,7 +42,7 @@ export default function Navbar() {
               <MdSearch className="absolute left-3 top-3 text-gray-400" size={20} />
               <input
                 type="text"
-                placeholder="Search"
+                placeholder="Cari"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:border-transparent text-sm"

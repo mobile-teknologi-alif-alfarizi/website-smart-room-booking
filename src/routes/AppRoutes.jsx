@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from '../pages/auth/Login';
 import Dashboard from '../pages/dashboard/Dashboard';
 import UserManagement from '../pages/dashboard/UserManagement';
+import KampusManagement from '../pages/dashboard/KampusManagement';
+import RuanganManagement from '../pages/dashboard/RuanganManagement';
 
 // Placeholder component untuk 404
 const NotFound = () => <div className="p-8"><h1 className="text-3xl font-bold">404 - Page Not Found</h1></div>;
@@ -47,6 +49,22 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <UserManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/kampus"
+        element={
+          <ProtectedRoute>
+            <KampusManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/ruangan"
+        element={
+          <ProtectedRoute>
+            <RuanganManagement />
           </ProtectedRoute>
         }
       />
