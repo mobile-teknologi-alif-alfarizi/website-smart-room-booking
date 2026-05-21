@@ -40,7 +40,7 @@ export default function KampusManagement() {
       setLoading(true);
       setError(null);
       const response = await kampusApi.getAllKampus();
-      setKampus(response.data || response || []);
+      setKampus(response.data?.data || []);
     } catch (err) {
       setError(err.response?.data?.message || 'Gagal mengambil data kampus');
       console.error('Error fetching kampus:', err);
