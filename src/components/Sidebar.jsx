@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { MdDashboard, MdSupervisorAccount, MdLocationOn, MdMeetingRoom } from 'react-icons/md';
+import { MdDashboard, MdSupervisorAccount, MdLocationOn, MdMeetingRoom, MdCalendarToday, MdNotifications } from 'react-icons/md';
 import logoImage from '@/assets/logo_ruangin.png';
 
 export default function Sidebar() {
@@ -12,6 +12,8 @@ export default function Sidebar() {
     { icon: <MdSupervisorAccount size={20} />, label: 'Manajemen User', path: '/dashboard/users' },
     { icon: <MdLocationOn size={20} />, label: 'Manajemen Kampus', path: '/dashboard/kampus' },
     { icon: <MdMeetingRoom size={20} />, label: 'Manajemen Ruangan', path: '/dashboard/ruangan' },
+    { icon: <MdCalendarToday size={20} />, label: 'Manajemen Booking', path: '/dashboard/bookings' },
+    { icon: <MdNotifications size={20} />, label: 'Manajemen Notifikasi', path: '/dashboard/notifications' },
   ];
 
   const isActive = (path) => location.pathname === path;
