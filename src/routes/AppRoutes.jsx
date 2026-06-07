@@ -6,6 +6,7 @@ import KampusManagement from '../pages/dashboard/KampusManagement';
 import RuanganManagement from '../pages/dashboard/RuanganManagement';
 import BookingManagement from '../pages/dashboard/BookingManagement';
 import NotificationManagement from '../pages/dashboard/NotificationManagement';
+import ChatManagement from '../pages/dashboard/ChatManagement';
 
 // Placeholder component untuk 404
 const NotFound = () => <div className="p-8"><h1 className="text-3xl font-bold">404 - Page Not Found</h1></div>;
@@ -83,6 +84,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <NotificationManagement />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/chat"
+        element={
+          <ProtectedRoute>
+            <ChatManagement />
           </ProtectedRoute>
         }
       />
